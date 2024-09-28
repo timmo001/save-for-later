@@ -1,5 +1,6 @@
 import { storage } from "wxt/storage";
 import { Link, Trash } from "lucide-react";
+import { v4 as uuidv4 } from "uuid";
 import { z } from "zod";
 
 import "./style.css";
@@ -9,7 +10,7 @@ import { Button } from "~/entrypoints/popup/components/ui/button";
 import { Separator } from "~/entrypoints/popup/components/ui/separator";
 
 const SavedItemSchema = z.object({
-  position: z.number(),
+  id: z.string(),
   url: z.string(),
 });
 
@@ -19,21 +20,24 @@ function App() {
   const [savedItems, setSavedItems] = useState<Array<SavedItem>>();
 
   useEffect(() => {
+    if (!savedItems)
+      getSavedItems().then((items) => {
+        if (items) {
+          setSavedItems(items);
+        } else {
+          setSavedItems([]);
+        }
+      });
+
     const unwatch = storage.watch<Array<SavedItem>>(
       "sync:savedItems",
       (newItems, oldItems) => {
         console.log("Items changed:", { newItems, oldItems });
+        if (newItems) {
+          setSavedItems(newItems);
+        }
       },
     );
-
-    // if (!savedItems)
-    //   getSavedItems().then((items) => {
-    //     if (items) {
-    //       setSavedItems(items);
-    //     } else {
-    //       setSavedItems([]);
-    //     }
-    //   });
 
     return () => {
       unwatch();
@@ -47,12 +51,24 @@ function App() {
   async function saveItem(item: SavedItem) {
     if (!savedItems) {
       await storage.setItem("sync:savedItems", [item]);
-      setSavedItems([item]);
+      // setSavedItems([item]);
       return;
     }
 
     const newSavedItems = [...savedItems, item];
-    setSavedItems(newSavedItems);
+    // setSavedItems(newSavedItems);
+    await storage.setItem("sync:savedItems", newSavedItems);
+  }
+
+  async function deleteItem(item: SavedItem) {
+    if (!savedItems) {
+      return;
+    }
+
+    const newSavedItems = savedItems.filter(
+      (savedItem) => savedItem.id !== item.id,
+    );
+    // setSavedItems(newSavedItems);
     await storage.setItem("sync:savedItems", newSavedItems);
   }
 
@@ -62,9 +78,9 @@ function App() {
         <svg
           className="w-1/3"
           fill="none"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-          stroke-width="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth="2"
           version="1.1"
           viewBox="0 0 24 24"
           xmlns="http://www.w3.org/2000/svg"
@@ -107,7 +123,7 @@ function App() {
                   }
 
                   saveItem({
-                    position: 0,
+                    id: uuidv4(),
                     url: currentTab.url,
                   });
                 });
@@ -119,30 +135,39 @@ function App() {
         </section>
         <Separator className="w-full my-6" />
 
-        <section className="flex flex-col items-center">
+        <section className="flex flex-col items-center w-full">
           <h2 className="text-lg font-semibold text-primary">Saved Items</h2>
           {savedItems && savedItems.length > 0 ? (
-            <ul className="w-full mt-6">
-              {savedItems.map((item) => (
-                <li
-                  key={item.url}
-                  className="flex flex-row items-center justify-between p-2 rounded-md bg-slate-300 dark:bg-slate-950"
-                >
-                  <a
-                    className="flex-1 text-sm"
-                    href={item.url}
-                    referrerPolicy="no-referrer"
-                    target="_blank"
+            <div className="w-full mt-6">
+              {savedItems.map((item, index) => (
+                <>
+                  <div
+                    key={index}
+                    className="flex flex-row items-center justify-between w-full p-2 my-1 rounded-xl bg-slate-300 dark:bg-slate-950"
                   >
-                    {item.url}
-                  </a>
-                  <Button variant="outline" size="sm">
-                    <Trash size={12} />
-                    <span className="sr-only">Remove</span>
-                  </Button>
-                </li>
+                    <a
+                      className="flex-1 ml-1 text-sm"
+                      href={item.url}
+                      referrerPolicy="no-referrer"
+                      target="_blank"
+                    >
+                      {item.url}
+                    </a>
+                    <Button
+                      className="ml-2"
+                      size="sm"
+                      variant="destructive"
+                      onClick={() => {
+                        deleteItem(item);
+                      }}
+                    >
+                      <Trash size={12} />
+                      <span className="sr-only">Remove</span>
+                    </Button>
+                  </div>
+                </>
               ))}
-            </ul>
+            </div>
           ) : (
             <p className="text-sm text-center">You have no saved items.</p>
           )}
