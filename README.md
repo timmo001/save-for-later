@@ -1,3 +1,3 @@
-# WXT + React
+# Save for later
 
-This template should help get you started developing with React in WXT.
+A browser extension that allows you to save links to read later.
